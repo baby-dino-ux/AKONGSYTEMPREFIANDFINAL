@@ -212,5 +212,9 @@ public static String hashPassword(String password) {
         return null;
     }
 }
+
+    public void viewRecords(String query, String[] headers, String[] cols, int staffId) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 }
 

@@ -1,25 +1,15 @@
-/*
- * Cleaning Service Booking System
- */
 package cleanmain;
 
 import config.config;
 import java.util.Scanner;
+import java.util.List;
+import java.util.Map;
 
 public class main {
-
-    // Reusable method: View all users
-    public static void viewUser() {
-        String votersQuery = "SELECT * FROM tbl_user";
-        String[] votersHeaders = {"ID", "Name", "Email", "Address", "Contact Number", "Type", "Password", "Status"};
-        String[] votersColumns = {"u_id", "u_name", "u_email", "u_address", "u_contact", "u_type", "u_pass", "u_status"};
-        config conf = new config();
-        conf.viewRecords(votersQuery, votersHeaders, votersColumns);
-    }
-
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         config db = new config();
+
         db.connectDB();
 
         while (true) {
@@ -30,107 +20,123 @@ public class main {
             System.out.println("2. Register");
             System.out.println("3. Exit");
             System.out.print("Enter Your Choice: ");
-            int choice = sc.nextInt();
+
+            int choice;
+            try {
+                choice = Integer.parseInt(sc.nextLine().trim());
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a number.");
+                continue;
+            }
 
             switch (choice) {
                 case 1: // LOGIN
                     System.out.print("Enter User Email: ");
-                    String ema = sc.next();
+                    String email = sc.nextLine().trim();
                     System.out.print("Enter Password: ");
-                    String pas = sc.next();
+                    String password = sc.nextLine().trim();
 
-                    // Fetch user by email
                     String qry = "SELECT * FROM tbl_user WHERE u_email = ?";
-                    java.util.List<java.util.Map<String, Object>> result = db.fetchRecords(qry, ema);
+                    List<Map<String, Object>> result = db.fetchRecords(qry, email);
 
                     if (result.isEmpty()) {
                         System.out.println("INVALID CREDENTIALS.");
                     } else {
-                        java.util.Map<String, Object> user = result.get(0);
+                        Map<String, Object> user = result.get(0);
                         String storedPass = user.get("u_pass").toString();
+                        String hashedInput = config.hashPassword(password);
 
-                        // ✅ Try to match both plain text and hashed passwords
-                        boolean passwordMatch = false;
-
-                        try {
-                            String hashedInput = config.hashPassword(pas);
-                            if (storedPass.equals(pas) || storedPass.equals(hashedInput)) {
-                                passwordMatch = true;
-                            }
-                        } catch (Exception e) {
-                            // fallback if hashing fails
-                            if (storedPass.equals(pas)) {
-                                passwordMatch = true;
-                            }
-                        }
-
-                        if (!passwordMatch) {
-                            System.out.println("INVALID CREDENTIALS.");
-                        } else {
-                            String stat = user.get("u_status").toString();
+                        if (hashedInput != null && (storedPass.equals(password) || storedPass.equals(hashedInput))) {
+                            String status = user.get("u_status").toString();
                             String type = user.get("u_type").toString();
                             int userId = Integer.parseInt(user.get("u_id").toString());
 
-                            if (stat.equalsIgnoreCase("Pending")) {
+                            if (status.equalsIgnoreCase("Pending")) {
                                 System.out.println("Account is Pending. Contact the Admin!");
                             } else {
                                 System.out.println("LOGIN SUCCESS!");
-
                                 if (type.equalsIgnoreCase("Admin")) {
                                     Admin admin = new Admin();
-                                    admin.Admin(); // when Admin logs out, return here
+                                    admin.showDashboard();
                                 } else if (type.equalsIgnoreCase("Staff")) {
                                     Staff staff = new Staff(userId);
-                                    staff.showDashboard(); // when Staff logs out, return here
+                                    staff.showDashboard();
+                                } else if (type.equalsIgnoreCase("Employee")) {
+                                    Employee employee = new Employee(userId);
+                                    employee.showDashboard();
                                 }
-
-                                // After logout, continue to show main menu
                                 System.out.println("\nReturning to Main Menu...\n");
                             }
+                        } else {
+                            System.out.println("INVALID CREDENTIALS.");
                         }
                     }
                     break;
 
-                case 2: // REGISTER
+                case 2: // REGISTER (Admin, Staff, Employee only)
                     System.out.print("Enter User Name: ");
-                    String name = sc.next();
+                    String name = sc.nextLine().trim();
                     System.out.print("Enter User Email: ");
-                    String email = sc.next();
+                    String newEmail = sc.nextLine().trim();
 
-                    // Check for existing email
-                    while (true) {
-                        String qryCheck = "SELECT * FROM tbl_user WHERE u_email = ?";
-                        java.util.List<java.util.Map<String, Object>> resultCheck = db.fetchRecords(qryCheck, email);
-
-                        if (resultCheck.isEmpty()) {
-                            break;
-                        } else {
-                            System.out.print("Email already exists, Enter another Email: ");
-                            email = sc.next();
-                        }
+                    String qryCheck = "SELECT * FROM tbl_user WHERE u_email = ?";
+                    while (!db.fetchRecords(qryCheck, newEmail).isEmpty()) {
+                        System.out.print("Email already exists, Enter another Email: ");
+                        newEmail = sc.nextLine().trim();
                     }
 
                     System.out.print("Enter User Address: ");
-                    String address = sc.next();
+                    String address = sc.nextLine().trim();
                     System.out.print("Enter User Contact Number: ");
-                    String contact = sc.next();
+                    String contact = sc.nextLine().trim();
 
-                    System.out.print("Enter user Type (1 - Admin / 2 - Staff): ");
-                    int type = sc.nextInt();
-                    while (type > 2 || type < 1) {
-                        System.out.print("Invalid, choose between 1 & 2 only: ");
-                        type = sc.nextInt();
+                    System.out.println("\nSelect User Type:");
+                    System.out.println("1. Admin");
+                    System.out.println("2. Staff");
+                    System.out.println("3. Employee");
+                    System.out.print("Enter choice (1-3): ");
+
+                    int type;
+                    try {
+                        type = Integer.parseInt(sc.nextLine().trim());
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Registration cancelled.");
+                        continue;
                     }
-                    String tp = (type == 1) ? "Admin" : "Staff";
+
+                    if (type < 1 || type > 3) {
+                        System.out.println("Invalid choice. Registration cancelled.");
+                        continue;
+                    }
+
+                    String userType;
+                    switch (type) {
+                        case 1: userType = "Admin"; break;
+                        case 2: userType = "Staff"; break;
+                        default: userType = "Employee"; break;
+                    }
 
                     System.out.print("Enter Password: ");
-                    String pass = sc.next();
-
-                    // ✅ Hash password before saving
+                    String pass = sc.nextLine().trim();
                     String hashedPass = config.hashPassword(pass);
 
+                    if (hashedPass == null) {
+                        System.out.println("Error in password processing. Registration cancelled.");
+                        continue;
+                    }
+
                     String sql = "INSERT INTO tbl_user(u_name, u_email, u_address, u_contact, u_type, u_pass, u_status) VALUES (?, ?, ?, ?, ?, ?, ?)";
-                    db.addRecord(sql, name, email, address, contact, tp, hashedPass, "Pending");
+                    db.addRecord(sql, name, newEmail, address, contact, userType, hashedPass, "Pending");
+
+                    if (userType.equals("Employee")) {
+                        List<Map<String, Object>> newUser = db.fetchRecords("SELECT u_id FROM tbl_user WHERE u_email = ?", newEmail);
+                        if (!newUser.isEmpty()) {
+                            int newUserId = Integer.parseInt(newUser.get(0).get("u_id").toString());
+                            String empSql = "INSERT INTO tbl_employee(user_id, e_name, e_role, e_status) VALUES (?, ?, ?, ?)";
+                            db.addRecord(empSql, newUserId, name, "Cleaner", "Available");
+                        }
+                    }
+
                     System.out.println("Registration successful! Please wait for admin approval.\n");
                     break;
 
